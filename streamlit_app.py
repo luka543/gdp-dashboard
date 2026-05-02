@@ -1,151 +1,63 @@
 import streamlit as st
-import pandas as pd
-import math
-from pathlib import Path
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+st.set_page_config(page_title="Luka's TaxAI", page_icon="💼", layout="centered")
+st.title("🚀 Luka's Agentic TaxAI")
+st.subheader("Your Autonomous Tax Expert for Tanzania")
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# Business Memory
+if 'business' not in st.session_state:
+    st.session_state.business = {
+        "name": "Luka General Shop",
+        "turnover": 80000000,
+        "location": "Kariakoo",
+        "status": "Not Registered"
+    }
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+st.sidebar.header("Your Business")
+st.sidebar.write(f"**{st.session_state.business['name']}**")
+st.sidebar.write(f"Turnover: {st.session_state.business['turnover']/1000000}M TZS")
+st.sidebar.write(f"Location: {st.session_state.business['location']}")
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+# Agent Functions
+def calculate_tax(turnover):
+    tax = round(turnover * 0.032, 2)  # Average presumptive rate
+    return tax
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+# Main Interface
+tab1, tab2, tab3 = st.tabs(["💬 Ask TaxAI", "📊 Tax Calculator", "📋 Registration Agent"])
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
-
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
-
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
-
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
+with tab1:
+    question = st.text_input("Ask your TaxAI Agent anything:")
+    if st.button("Send Question"):
+        if question:
+            q = question.lower()
+            if "tin" in q:
+                answer = "✅ **TIN Registration**: Visit tra.go.tz or TRA App. Upload ID. Usually ready in 1-3 days."
+            elif "tax" in q or "how much" in q:
+                tax = calculate_tax(st.session_state.business["turnover"])
+                answer = f"📌 For {st.session_state.business['turnover']/1000000}M TZS turnover: Estimated Presumptive Tax = **{tax/1000000:.1f}M TZS/year**"
+            elif "register" in q:
+                answer = "1. Get TIN\n2. Business License from Council\n3. Fiscal Device (EFD)\n4. Open Bank Account"
+            else:
+                answer = "I'm your Agentic Tax Consultant. I can help with registration, calculations, compliance, and business setup in Tanzania."
+            st.success(answer)
         else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
+            st.warning("Please type a question.")
 
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+with tab2:
+    st.write("### Presumptive Tax Calculator")
+    turnover = st.number_input("Annual Turnover (TZS)", value=80000000, step=1000000)
+    if st.button("Calculate Tax"):
+        tax = calculate_tax(turnover)
+        st.success(f"**Estimated Annual Tax: {tax:,.0f} TZS**")
+        st.info("This is under Presumptive Regime (turnover < 100M).")
+
+with tab3:
+    st.write("### Registration Agent")
+    if st.button("Start Full Registration Process"):
+        st.write("**Step 1: TIN** → Done in 1-3 days")
+        st.write("**Step 2: Business License** → Municipal Council")
+        st.write("**Step 3: Fiscal Device** → Mandatory for your shop")
+        st.success("Registration Progress Saved! I will remember your business.")
+
+st.caption("Agentic TaxAI v1.0 - Built for Luka | Tanzania Focused")
